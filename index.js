@@ -12,7 +12,9 @@ const {
   EVENT_TEST_FAIL,
   EVENT_TEST_PASS,
   EVENT_SUITE_BEGIN,
-  EVENT_SUITE_END
+  EVENT_SUITE_END,
+  EVENT_HOOK_BEGIN,
+  EVENT_HOOK_END
 } = Mocha.Runner.constants
 
 class ImageReporter extends Spec {
@@ -125,6 +127,30 @@ class ImageReporter extends Spec {
     runner
       .once(EVENT_RUN_BEGIN, function () {
       })
+      .on(EVENT_HOOK_BEGIN, (hook) => {
+      })
+      .on(EVENT_HOOK_END, (hook) => {
+        const test = hook.ctx.currentTest
+        if (test) {
+          const isBefore = hook.ctx.beforeAll && !hook.ctx.afterAll
+          const isAfter = hook.ctx.beforeAll && hook.ctx.afterAll
+          const title = test.parent.title
+          let screenshots
+          let type = isBefore ? '(before)' : '(after)'
+
+          if (isBefore) {
+            screenshots = hook.ctx.beforeAll.screenshots
+          }
+          else if (isAfter) {
+            screenshots = hook.ctx.afterAll.screenshots
+          }
+
+          const link = test.fullTitle().replace(/\s/g, '_')+type
+          if (screenshots) {
+            this.addScreenshotGroup(test.fullTitle(), `${title} ${type}`, screenshots, test.ctx.expectedScreenshots, false)
+          }
+        }
+      })
       .on(EVENT_SUITE_BEGIN, (suite) => {
         if (suite.title !== '')
           this.menu += `<ul><h3>${suite.title}</h3>\n`
@@ -136,14 +162,16 @@ class ImageReporter extends Spec {
       .on(EVENT_TEST_PASS, test => {
         const link = test.fullTitle().replace(/\s/g, '_')
         this.menu += `<li><a style="color: #3c923c" href="#${link}">&#10004; ${test.title}</a></li>\n`
-        if (test.ctx && test.ctx.screenshots)
-          this.addScreenshotGroup(test.fullTitle(), test.title, test.ctx.screenshots, test.ctx.expectedScreenshots, false)
+        if (test.screenshots) {
+          this.addScreenshotGroup(test.fullTitle(), test.title, test.screenshots, test.ctx.expectedScreenshots, false, test.parent.title)
+        }
       })
       .on(EVENT_TEST_FAIL, (test, err) => {
         const link = test.fullTitle().replace(/\s/g, '_')
         this.menu += `<li><a style="color: #bf3030" href="#${link}">&#10008; ${test.title}</a></li>\n`
-        if (test.ctx && test.ctx.screenshots)
-          this.addScreenshotGroup(test.fullTitle(), test.title, test.ctx.screenshots, test.ctx.expectedScreenshots, true)
+        if (test.screenshots) {
+          this.addScreenshotGroup(test.fullTitle(), test.title, test.screenshots, test.ctx.expectedScreenshots, true)
+        }
       })
       .once(EVENT_RUN_END, async () => {
         const html = new htmlCreator(getHtml(this.menu, this.images))
@@ -151,7 +179,7 @@ class ImageReporter extends Spec {
       })
   }
 
-  addScreenshotGroup(fullTitle, testTitle, screenshots, expectedScreenshots, isError) {
+  addScreenshotGroup(fullTitle, testTitle, screenshots, expectedScreenshots, isError, parentTitle) {
     const thumbnails = screenshots.map(imagePath => {
       return {
         type: 'div',
