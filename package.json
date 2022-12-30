@@ -21,6 +21,6 @@
   "homepage": "https://github.com/calbertts/mocha-image-reporter#readme",
   "dependencies": {
     "html-creator": "^0.4.3",
-    "mocha": "^6.2.0"
+    "mocha": "^10.2.0"
   }
 }
